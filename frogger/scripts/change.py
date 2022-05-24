@@ -20,15 +20,6 @@ class ChangeScript(Script):
     def __init__(self, controller: Controller):
         self.controller = controller
 
-    def truncate_table(self) -> None:
-        """Truncates table in database."""
-
-        connection, cursor = self.controller.create_db_conn_and_cursr()
-        cursor.execute("truncate table src_change_event")
-        connection.commit()
-        cursor.close()
-        connection.close()
-
     def load_all_events(self, driver: WebDriver) -> None:
         """Loads additional events in page for full loading."""
 
@@ -41,13 +32,10 @@ class ChangeScript(Script):
 
     def get_events(self, driver: WebDriver) -> ResultSet[Tag]:
         """Gets events from page."""
-
         driver.get("https://changellenge.com/event/")
         soup = BeautifulSoup(driver.page_source, "html.parser")
-
         events = soup.find("ul", {"class": "new-events__tab new-events__tab--active"}) \
             .find_all("div", {"class": "new-events-card__content"})
-
         return events
 
     def parse_events(self, events: ResultSet[Tag]) -> list:
@@ -75,36 +63,20 @@ class ChangeScript(Script):
 
         return parsed_events
 
-    def load_to_database(self, events: list) -> None:
-        "Loads provided events to database."
-
-        connection, cursor = self.controller.create_db_conn_and_cursr()
-
-        command = """
-        INSERT INTO src_change_event
-        (name, event_day, site, event_type, event_month)
-        VALUES (%s, %s, %s, %s, %s)
-        """
-
-        for event in events:
-            cursor.execute(command, event)
-            connection.commit()
-
-        cursor.callproc("f_get_change_event")
-        connection.commit()
-
-        cursor.close()
-        connection.close()
-
     def run(self) -> None:
         """Runs script."""
-        self.truncate_table()
-        events = self.get_events(self.controller.driver)
-        parsed_events = self.parse_events(events)
-
-        self.load_to_database(parsed_events)
+        self.controller.event_database.truncate_table("src_change")
+        self.load_all_events(self.controller.webdriver)
+        events = self.get_events(self.controller.webdriver)
+        events_parsed = self.parse_events(events)
+        self.controller.event_database.insert_list_into_table(
+            "src_change",
+            "name, event_day, site, event_type, event_month",
+            events_parsed
+        )
+        self.controller.event_database.call_proc("f_get_change_event")
 
 
 def setup(controller: Controller) -> None:
     """Loads Script to controller."""
-    controller.add_script(ChangeScript(controller))
+    controller.install_script(ChangeScript(controller))

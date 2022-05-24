@@ -15,7 +15,7 @@ from frogger.controller import Controller
 
 class GSStartupsScript(Script):
 
-    _name = "Generation-Startup-Calendar script."
+    _name = "Generation-Startup-Calendar script"
     _description = "Script for parcing generation-startup.ru calendar"
     _author = "Frogger Team"
 
@@ -63,6 +63,7 @@ class GSStartupsScript(Script):
 
     def get_events(self, driver: WebDriver) -> ResultSet[Tag]:
         """Parses site `generation-startup.ru` with provided driver and returns raw events list."""
+        driver.get(f"{self.url}/calendar")
         soup = BeautifulSoup(driver.page_source, "html.parser")
         startups = soup.find_all("a", {"class": "events-startups__item-wrap"})
         return startups
@@ -122,37 +123,20 @@ class GSStartupsScript(Script):
 
         return parsed_events
 
-    def send_to_database(self, parsed_events: list[Tuple[str, str, str, str, str]]) -> None:
-        """Sends event's information to database."""
-        connection, cursor = self.controller.create_db_conn_and_cursr()
-        insert_event_command = """
-        INSERT INTO src_gs_calendar
-        (name, event_date, place, site, descr)
-        VALUES (%s, %s, %s, %s. %s)
-        """
-
-        for event in parsed_events:
-            cursor.execute(insert_event_command, event)
-
-        cursor.callproc("f_get_gs_calendar")
-        connection.commit()
-
-        cursor.close()
-        connection.close()
-
     def run(self) -> None:
-        self.truncate_table()
-
-        self.controller.driver.get(f"{self.url}/calendar")
-        self.load_full_page(self.controller.driver, True)
-
-        self.get_events(self.controller.driver)
-        events = self.get_events(self.controller.driver)
-        events_parsed = self.get_parsed_events(self.controller.driver, events)
-
-        self.send_to_database(events_parsed)
+        self.controller.event_database.truncate_table("table src_gs_calendar")
+        self.load_full_page(self.controller.webdriver, True)
+        self.get_events(self.controller.webdriver)
+        events = self.get_events(self.controller.webdriver)
+        events_parsed = self.get_parsed_events(self.controller.webdriver, events)
+        self.controller.event_database.insert_list_into_table(
+            "src_gs_calendar",
+            "name, event_date, place, site, descr",
+            events_parsed
+        )
+        self.controller.event_database.call_proc("f_get_gs_calendar")
 
 
 def setup(controller: Controller) -> None:
     """Loads Script to controller."""
-    controller.add_script(GSStartupsScript(controller))
+    controller.install_script(GSStartupsScript(controller))

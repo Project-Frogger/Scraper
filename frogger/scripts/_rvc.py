@@ -129,4 +129,4 @@ class RVCScript(Script):
 
 def setup(controller: Controller) -> None:
     """Loads Script to controller."""
-    controller.add_script(RVCScript(controller))
+    controller.install_script(RVCScript(controller))

@@ -11,20 +11,12 @@ from frogger.controller import Controller
 
 class GSStartupsScript(Script):
 
-    _name = "Generation-Startup script."
+    _name = "Generation-Startup script"
     _description = "Script for parcing generation-startup.ru"
     _author = "Frogger Team"
 
     def __init__(self, controller: Controller):
         self.controller = controller
-
-    def truncate_table(self) -> None:
-        """Truncates table for RBScript."""
-        connection, cursor = self.controller.create_db_conn_and_cursr()
-        cursor.execute("truncate table src_gs_startups")
-        connection.commit()
-        cursor.close()
-        connection.close()
 
     def get_startups(self, driver: WebDriver) -> ResultSet[Tag]:
         """Parses site `generation-startup.ru` with provided driver and returns raw startups list."""
@@ -53,31 +45,18 @@ class GSStartupsScript(Script):
 
         return parsed_startups
 
-    def send_to_database(self, parsed_startups: list[Tuple[str, str]]) -> None:
-        """Sends startup's information to database."""
-        connection, cursor = self.controller.create_db_conn_and_cursr()
-        insert_startup_command = """
-        INSERT INTO src_gs_startups
-        (name, site)
-        VALUES (%s, %s)
-        """
-
-        for startup in parsed_startups:
-            cursor.execute(insert_startup_command, startup)
-
-        cursor.callproc("f_get_gs_startups")
-        connection.commit()
-
-        cursor.close()
-        connection.close()
-
     def run(self) -> None:
-        self.truncate_table()
-        startups = self.get_startups(self.controller.driver)
+        self.controller.event_database.truncate_table("src_gs_startups")
+        startups = self.get_startups(self.controller.webdriver)
         startups_parsed = self.get_parsed_startups(startups)
-        self.send_to_database(startups_parsed)
+        self.controller.event_database.insert_list_into_table(
+            "src_gs_startups",
+            "name, site",
+            startups_parsed
+        )
+        self.controller.event_database.call_proc("f_get_gs_startups")
 
 
 def setup(controller: Controller) -> None:
     """Loads Script to controller."""
-    controller.add_script(GSStartupsScript(controller))
+    controller.install_script(GSStartupsScript(controller))
