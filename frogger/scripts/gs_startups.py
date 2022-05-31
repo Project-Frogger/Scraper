@@ -17,6 +17,7 @@ class GSStartupsScript(Script):
 
     def __init__(self, controller: Controller):
         self.controller = controller
+        self.database = controller.event_database
 
     def get_startups(self, driver: WebDriver) -> ResultSet[Tag]:
         """Parses site `generation-startup.ru` with provided driver and returns raw startups list."""
@@ -46,15 +47,15 @@ class GSStartupsScript(Script):
         return parsed_startups
 
     def run(self) -> None:
-        self.controller.event_database.truncate_table("src_gs_startups")
+        self.database.truncate_table("src_gs_startups")
         startups = self.get_startups(self.controller.webdriver)
         startups_parsed = self.get_parsed_startups(startups)
-        self.controller.event_database.insert_list_into_table(
+        self.database.insert_list_into_table(
             "src_gs_startups",
             "name, site",
             startups_parsed
         )
-        self.controller.event_database.call_proc("f_get_gs_startups")
+        self.database.call_proc("f_get_gs_startups")
 
 
 def setup(controller: Controller) -> None:

@@ -19,6 +19,7 @@ class RBScript(Script):
 
     def __init__(self, controller: Controller):
         self.controller = controller
+        self.database = controller.event_database
 
     def get_events(self, driver: WebDriver) -> ResultSet[Tag]:
         """Parses site rb.ru with provided driver and returns raw events list."""
@@ -60,15 +61,15 @@ class RBScript(Script):
         return parsed_events
 
     def run(self) -> None:
-        self.controller.event_database.truncate_table("src_rb")
+        self.database.truncate_table("src_rb")
         events = self.get_events(self.controller.webdriver)
         events_parsed = self.get_parsed_events(events)
-        self.controller.event_database.insert_list_into_table(
+        self.database.insert_list_into_table(
             "src_rb",
             "name, event_day, site, event_type, event_month",
             events_parsed
         )
-        self.controller.event_database.call_proc("f_get_rb")
+        self.database.call_proc("f_get_rb")
 
 
 def setup(controller: Controller) -> None:

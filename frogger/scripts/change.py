@@ -19,6 +19,7 @@ class ChangeScript(Script):
 
     def __init__(self, controller: Controller):
         self.controller = controller
+        self.database = controller.event_database
 
     def load_all_events(self, driver: WebDriver) -> None:
         """Loads additional events in page for full loading."""
@@ -65,16 +66,16 @@ class ChangeScript(Script):
 
     def run(self) -> None:
         """Runs script."""
-        self.controller.event_database.truncate_table("src_change")
+        self.database.truncate_table("src_change")
         self.load_all_events(self.controller.webdriver)
         events = self.get_events(self.controller.webdriver)
         events_parsed = self.parse_events(events)
-        self.controller.event_database.insert_list_into_table(
+        self.database.insert_list_into_table(
             "src_change",
             "name, event_day, site, event_type, event_month",
             events_parsed
         )
-        self.controller.event_database.call_proc("f_get_change_event")
+        self.database.call_proc("f_get_change_event")
 
 
 def setup(controller: Controller) -> None:

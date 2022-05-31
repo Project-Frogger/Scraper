@@ -21,16 +21,9 @@ class GSStartupsScript(Script):
 
     def __init__(self, controller: Controller):
         self.controller = controller
+        self.database = controller.event_database
         self.sleep_time = 3
         self.url = "https://generation-startup.ru"
-
-    def truncate_table(self) -> None:
-        """Truncates table for RBScript."""
-        connection, cursor = self.controller.create_db_conn_and_cursr()
-        cursor.execute("truncate table src_gs_calendar")
-        connection.commit()
-        cursor.close()
-        connection.close()
 
     def load_full_page(self, driver: WebDriver, main_page=False) -> None:
         """
@@ -124,17 +117,17 @@ class GSStartupsScript(Script):
         return parsed_events
 
     def run(self) -> None:
-        self.controller.event_database.truncate_table("table src_gs_calendar")
+        self.database.truncate_table("table src_gs_calendar")
         self.load_full_page(self.controller.webdriver, True)
         self.get_events(self.controller.webdriver)
         events = self.get_events(self.controller.webdriver)
         events_parsed = self.get_parsed_events(self.controller.webdriver, events)
-        self.controller.event_database.insert_list_into_table(
+        self.database.insert_list_into_table(
             "src_gs_calendar",
             "name, event_date, place, site, descr",
             events_parsed
         )
-        self.controller.event_database.call_proc("f_get_gs_calendar")
+        self.database.call_proc("f_get_gs_calendar")
 
 
 def setup(controller: Controller) -> None:
