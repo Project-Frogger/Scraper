@@ -1,11 +1,6 @@
-import time
-
-from typing import Tuple
-
-from bs4 import BeautifulSoup, ResultSet
-from bs4.element import Tag
-
-from selenium.webdriver.firefox.webdriver import WebDriver
+import json
+from urllib.request import Request, urlopen
+from itertools import count
 
 from frogger.script import Script
 from frogger.controller import Controller
@@ -28,52 +23,44 @@ class RBScript(Script):
         cursor.close()
         connection.close()
 
-    def get_events(self, driver: WebDriver) -> ResultSet[Tag]:
-        """Parses site rb.ru with provided driver and returns raw events list."""
-        driver.get("https://rb.ru/chance/")
+    def get_events(self) -> list[dict]:
+        """Parses site rb.ru api returns raw events list."""  
+        events = []
+        for i in count(1):
+            req = Request(
+                url=f'https://rb.ru/api/chance/list/?page={i}&limit=32&orphans=5', 
+                headers={'User-Agent': 'Mozilla/5.0'}
+            )
+            response = urlopen(req).read()
+            response_json = json.loads(response)
 
-        last_height = driver.execute_script("return document.body.scrollHeight;")
+            events.extend(response_json.get('project_list'))
+            if response_json.get('num_pages') == i:
+                return events
 
-        while True:
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
-            time.sleep(5)
-
-            new_height = driver.execute_script("return document.body.scrollHeight;")
-
-            if new_height == last_height:
-                break
-
-            last_height = new_height
-
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        events = soup.find_all("div", {"class": "chance__card"})
-
-        return events
-
-    def get_parsed_events(self, events: ResultSet[Tag]) -> list[Tuple[str, str, str, str, str]]:
+    def get_parsed_events(self, events: list[dict]) -> list[tuple[str, str, str, str]]:
         """Parses raw events and returns list with information about event."""
         parsed_events = []
 
-        for event in events:
-            name: str = event.find("a", {"class": "chance__card-name-item ng-binding"}).get_text()
-            link: str = event.find("a", {"class": "chance__card-name-item ng-binding"}).get('href')
-            day: str = event.find("div", {"class": "chance__card-date-number ng-binding"}).get_text()
-            month: str = event.find("div", {"class": "chance__card-date-month ng-binding"}).get_text()
-            type: str = event.find("div", {"class": "chance__card-name-categ ng-binding"}).get_text()
+        for event in events:         
+            name: str = event.get('name')
+            link: str = event.get('url')
+            date: str = event.get('stop_dt')
+            type: str = event.get('category').get('name')
 
-            parsed_event = (name, day, link, type, month)
+            parsed_event = (name, date, link, type)
             parsed_events.append(parsed_event)
 
         return parsed_events
 
-    def send_to_database(self, parsed_events: list[Tuple[str, str, str, str, str]]) -> None:
+    def send_to_database(self, parsed_events: list[tuple[str, str, str, str]]) -> None:
         """Sends event's information to database."""
         connection, cursor = self.controller.create_db_conn_and_cursr()
         insert_event_command = """
         INSERT INTO src_rb
-        (name, event_day, site, event_type, event_month)
-        VALUES (%s, %s, %s, %s, %s)
+        (name, date_from, site, event_type)
+        VALUES (%s, %s, %s, %s)
         """
 
         for event in parsed_events:
@@ -87,8 +74,14 @@ class RBScript(Script):
 
     def run(self) -> None:
         self.truncate_table()
-        events = self.get_events(self.controller.driver)
+        
+        print("rb: >>>>>>>>>>>> getting events <<<<<<<<<<<<")
+        events = self.get_events()
+        
+        print("rb: >>>>>>>>>>>> parsing events <<<<<<<<<<<<")
         events_parsed = self.get_parsed_events(events)
+        
+        print("rb: >>>>>>>>>>>> sending events to database <<<<<<<<<<<<")
         self.send_to_database(events_parsed)
 
 

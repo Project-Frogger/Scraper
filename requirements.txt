@@ -1,5 +1,5 @@
 beautifulsoup4
-mysql.connector
+mysql-connector-python
 requests
 selenium
 webdriver_manager

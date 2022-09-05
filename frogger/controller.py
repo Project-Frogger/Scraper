@@ -43,7 +43,7 @@ class Controller:
 
     def create_driver(self) -> None:
         """Creates Firefox driver."""
-        service = Service(GeckoDriverManager(log_level=30).install())
+        service = Service(GeckoDriverManager().install())
         options = FirefoxOptions()
         options.add_argument("--headless")
         self._driver = webdriver.Firefox(service=service, options=options)

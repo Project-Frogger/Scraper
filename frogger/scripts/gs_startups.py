@@ -17,6 +17,8 @@ class GSStartupsScript(Script):
 
     def __init__(self, controller: Controller):
         self.controller = controller
+        self.sleep_time = 3
+        self.url = "https://generation-startup.ru/startups/"
 
     def truncate_table(self) -> None:
         """Truncates table for RBScript."""
@@ -28,10 +30,10 @@ class GSStartupsScript(Script):
 
     def get_startups(self, driver: WebDriver) -> ResultSet[Tag]:
         """Parses site `generation-startup.ru` with provided driver and returns raw startups list."""
-        driver.get("https://generation-startup.ru/startups/")
+        driver.get(self.url)
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+        soup = BeautifulSoup(driver.page_source, "html.parser").find("div", {"class": "main-accelerators__wrapper--left"})
         startups = soup.find_all("div", {"class": "main-accelerators__item-wrap"})
 
         return startups
@@ -42,13 +44,16 @@ class GSStartupsScript(Script):
 
         for startup in startups:
             name: str = startup.find("div", {"class": "main-accelerators__name"}).get_text()
-            link: str = startup.find("a", {"class": "button"}).get('href')
+            
+            
+            link: str = startup.find("a", {"class": "button"})
+            if link is not None:
+                link: str = startup.find("a", {"class": "button"}).get('href')
 
-            if link.startswith("/"):
-                link = ("https://generation-startup.ru" + link).replace(" ", "%20")
+                if link.startswith("/"):
+                    link = ("https://generation-startup.ru" + link).replace(" ", "%20")
 
             parsed_startup = (name, link)
-
             parsed_startups.append(parsed_startup)
 
         return parsed_startups
@@ -73,8 +78,14 @@ class GSStartupsScript(Script):
 
     def run(self) -> None:
         self.truncate_table()
+        
+        print("gs_startups: >>>>>>>>>>>> getting events <<<<<<<<<<<<")
         startups = self.get_startups(self.controller.driver)
+        
+        print("gs_startups: >>>>>>>>>>>> parsing events <<<<<<<<<<<<")
         startups_parsed = self.get_parsed_startups(startups)
+        
+        print("gs_startups: >>>>>>>>>>>> sending events to database <<<<<<<<<<<<")
         self.send_to_database(startups_parsed)
 
 
