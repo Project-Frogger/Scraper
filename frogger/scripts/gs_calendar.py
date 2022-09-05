@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup, ResultSet
 from bs4.element import Tag
 
 from selenium.webdriver.firefox.webdriver import WebDriver
+from selenium.webdriver.common.by import By
 from selenium.common.exceptions import ElementNotInteractableException
 from selenium.common.exceptions import NoSuchElementException
 
@@ -47,7 +48,7 @@ class GSStartupsScript(Script):
 
             if main_page:
                 try:
-                    submit_button = driver.find_element_by_css_selector('.button-add')
+                    submit_button = driver.find_element(By.CSS_SELECTOR, '.button-add.js-add-more')
                     submit_button.click()
                 except ElementNotInteractableException:
                     print("DEBUG: Button not interactable.")
@@ -128,7 +129,7 @@ class GSStartupsScript(Script):
         insert_event_command = """
         INSERT INTO src_gs_calendar
         (name, event_date, place, site, descr)
-        VALUES (%s, %s, %s, %s. %s)
+        VALUES (%s, %s, %s, %s, %s)
         """
 
         for event in parsed_events:
@@ -144,12 +145,17 @@ class GSStartupsScript(Script):
         self.truncate_table()
 
         self.controller.driver.get(f"{self.url}/calendar")
+        
+        print("gs_calendar: >>>>>>>>>>>> loading main page <<<<<<<<<<<<")
         self.load_full_page(self.controller.driver, True)
 
-        self.get_events(self.controller.driver)
+        print("gs_calendar: >>>>>>>>>>>> getting events <<<<<<<<<<<<")
         events = self.get_events(self.controller.driver)
+        
+        print("gs_calendar: >>>>>>>>>>>> parsing events <<<<<<<<<<<<")
         events_parsed = self.get_parsed_events(self.controller.driver, events)
-
+        
+        print("gs_calendar: >>>>>>>>>>>> sending events to database <<<<<<<<<<<<")
         self.send_to_database(events_parsed)
 
 
